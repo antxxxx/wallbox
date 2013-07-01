@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
 # Copyright (C) 2013 Stephen Devlin
@@ -5,35 +6,24 @@
 import RPi.GPIO as GPIO
 import time
 import sys, httplib
+import logging
+logger = logging.getLogger('jukeboxcontroller')
+hdlr = logging.FileHandler('/var/log/jukeboxcontroller.log')
+formatter = logging.Formatter('%(asctime)s %(levelname)s %(message)s')
+hdlr.setFormatter(formatter)
+logger.addHandler(hdlr) 
+logger.setLevel(logging.INFO)
 
 #contants and literals
-SELECTION_LETTERS=("A","B","C","D","E","F","G","H","J","K","L","M","N","P","Q","R","S","T","U","V")
+SELECTION_LETTERS=("A","B","C","D","E","F","G","H","J","K")
 WALLBOX=13
 
 #>>>these constants can be changed to fit the characteristics of your wallbox
 MAXMIMUM_GAP=3
-MINIMUM_PULSE_GAP_WIDTH=0.004
-LETTER_NUMBER_GAP=0.12
-
-#>>> you will need to change the directory name in the SOAP message to correspond
-#>>> with the location of your jukebox music files
-
-SOAP_TEMPLATE = """<?xml version="1.0" encoding="UTF-8"?>
-<SOAP-ENV:Envelope SOAP-ENV:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/" xmlns:SOAP-ENV="http://schemas.xmlsoap.org/soap/envelope/">
-<SOAP-ENV:Body>
-<ns1:AddURIToQueue xmlns:ns1="urn:schemas-upnp-org:service:AVTransport:1">
-              <InstanceID>0</InstanceID>
-              <EnqueuedURI>x-file-cifs://Rainbow-Media/QRecordings/jukebox/%s.mp3</EnqueuedURI>
-              <EnqueuedURIMetaData></EnqueuedURIMetaData>
-              <DesiredFirstTrackNumberEnqueued>0</DesiredFirstTrackNumberEnqueued>
-              <EnqueueAsNext>1</EnqueueAsNext>
-        </ns1:AddURIToQueue>
-</SOAP-ENV:Body>
-</SOAP-ENV:Envelope>
-"""
+MINIMUM_PULSE_GAP_WIDTH=0.001
+LETTER_NUMBER_GAP=0.10
 
 #set up IO port for input
-
 GPIO.setmode(GPIO.BOARD)
 GPIO.setup(WALLBOX, GPIO.IN)
 
@@ -48,10 +38,10 @@ def state_has_changed(starting_state):
     starting_time = time.time()
     elapsed_time = 0
 
-    for i in range (200):
+    for i in range (400):
         if GPIO.input(WALLBOX) != starting_state: 
             elapsed_time = time.time() - starting_time
-#            print ("check time recorded: %.3f" %elapsed_time)
+            #print ("check time recorded: %.3f" %elapsed_time)
             return False
     return True
         
@@ -79,7 +69,7 @@ def calculate_track():
                 state = not state # I use this rather than the GPIO value just in case GPIO has changed - unlikely but possible
                 if state: #indicates we're in a new pulse
                     length_of_last_gap = time.time() - time_of_last_gap 
-                    print ("Pulse.  Last gap: %.3f" %length_of_last_gap)
+                    #print ("Pulse.  Last gap: %.3f" %length_of_last_gap)
 
                     if length_of_last_gap > LETTER_NUMBER_GAP: # indicates we're into the second train of pulses
                         first_train = False
@@ -91,42 +81,37 @@ def calculate_track():
                 else: #indicates we're in a new gap
                     time_of_last_gap = time.time()
         else:
-            length_of_last_gap = time.time() - time_of_last_gap #update gap length and continue to poll
+            length_of_last_gap = time.time() - time_of_last_gap #update gap length and continue to poll    
+    if count_of_number_pulses > 10 :
+       count_of_number_pulses = count_of_number_pulses - 10
+       count_of_letter_pulses = count_of_letter_pulses * 2
+    else :
+       count_of_letter_pulses = (count_of_letter_pulses * 2) - 1
 
     track = SELECTION_LETTERS[count_of_letter_pulses-1] + str((count_of_number_pulses-1))
-    print ("+++ TRACK FOUND +++ Track Selection: ", track)
+    message = ("+++ TRACK FOUND +++ Track Selection: ", track)
+    logger.info (message)
     return   track
 
+def play_song(track) :
+   url = "/sonos.py?action=enqueue&selection=%s"%track
+   conn = httplib.HTTPConnection("localhost:8000")
+   conn.request("GET", url)
+   res = conn.getresponse()
 
-#this function constructs and sends the header
-
-def play_song(track):
-    
-        SoapMessage = SOAP_TEMPLATE%(track)
-        webservice = httplib.HTTP("192.168.1.70:1400")
-        webservice.putrequest("POST", "/MediaRenderer/AVTransport/Control")
-        webservice.putheader("Host", "192.168.1.70:1400")
-        webservice.putheader("User-Agent", "Python post")
-        webservice.putheader("Content-type", "text/xml; charset=\"UTF-8\"")
-        webservice.putheader("Content-length", "%d" % len(SoapMessage))
-        webservice.putheader("SOAPAction", "urn:schemas-upnp-org:service:AVTransport:1#AddURIToQueue")
-        webservice.endheaders()
-        webservice.send(SoapMessage)
-
-
-#this is the main loop.  We poll the GPIO port until there is a pulse.
-#sometimes there can be random pulses, or a spike when the rotor arm starts to move 
+#this is the main loop. We poll the GPIO port until there is a pulse.
+#sometimes there can be random pulses, or a spike when the rotor arm starts to move
 #so before trying to decode the pulse train I check that
 #the pulse is long enough to indicate a contact on the selector arm
 
+logger.info ("starting controller")
 while True:
     if GPIO.input(WALLBOX):
         if state_has_changed(True):
             track = calculate_track()
             play_song(track)
-        else:
-            print ("--> Pulse ignored")
+        #else:
+#            print ("--> Pulse ignored")nqueue&selection=%s"%track
 
-      
 
 
