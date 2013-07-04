@@ -21,7 +21,7 @@ WALLBOX=13
 #>>>these constants can be changed to fit the characteristics of your wallbox
 MAXMIMUM_GAP=3
 MINIMUM_PULSE_GAP_WIDTH=0.001
-LETTER_NUMBER_GAP=0.10
+LETTER_NUMBER_GAP=0.1
 
 #set up IO port for input
 GPIO.setmode(GPIO.BOARD)
@@ -82,7 +82,9 @@ def calculate_track():
                     time_of_last_gap = time.time()
         else:
             length_of_last_gap = time.time() - time_of_last_gap #update gap length and continue to poll    
-    if count_of_number_pulses > 10 :
+    print count_of_number_pulses
+    print count_of_letter_pulses
+    if count_of_number_pulses > 11 :
        count_of_number_pulses = count_of_number_pulses - 10
        count_of_letter_pulses = count_of_letter_pulses * 2
     else :
@@ -108,8 +110,11 @@ logger.info ("starting controller")
 while True:
     if GPIO.input(WALLBOX):
         if state_has_changed(True):
-            track = calculate_track()
-            play_song(track)
+            try:
+              track = calculate_track()
+              play_song(track)
+            except:
+              logger.info ("error calculating track")
         #else:
 #            print ("--> Pulse ignored")nqueue&selection=%s"%track
 
