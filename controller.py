@@ -80,7 +80,7 @@ def handle_key_combo(host, url, wallbox, letter, number):
     url = url % {'wallbox': wallbox, 'letter': letter, 'number': number}
     logger.info("selection: %s%d" % (letter, number))
     conn = httplib.HTTPConnection(host)
-    conn.request("POST", url)
+    conn.request("GET", url)
     res = conn.getresponse()
     logger.info(res)
 
