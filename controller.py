@@ -13,7 +13,7 @@ from threading import Lock
 # Which pin to watch
 PIN = 13
 # How much time a change must be since the last in order to count as a change
-IGNORE_CHANGE_BELOW = 0.02
+IGNORE_CHANGE_BELOW = 0.04
 # What is the minimum time since the last pulse for a pulse to count as "after the gap"
 MIN_GAP_LEN = 0.2
 # What is the mimimum time since the last pulse for a pulse to count as a new train
@@ -57,11 +57,15 @@ def handle_gpio_interrupt(channel):
                 if pre_gap and diff > MIN_GAP_LEN and diff < MIN_TRAIN_BOUNDARY:
                     pre_gap = False
 		    logger.debug(diff)
+		    logger.debug(pre_gap_pulses)
 
                 if pre_gap:
                     pre_gap_pulses += 1
                 else:
-                    post_gap_pulses += 1
+		    if pre_gap_pulses == 1:
+			pre_gap = True
+		    else:
+                   	post_gap_pulses += 1
 
             last_change = now
         finally:
@@ -81,7 +85,8 @@ def handle_key_combo(host, url, wallbox, letter, number):
     url = url % {'wallbox': wallbox, 'letter': letter, 'number': number}
     logger.info("selection: %s%d" % (letter, number))
     conn = httplib.HTTPConnection(host)
-    conn.request("POST", url)
+    headers = {'Content-type': 'application/json', 'Accept': 'text/plain'}
+    conn.request("POST", url,'' , headers)
     res = conn.getresponse()
     logger.info(res)
 
@@ -102,6 +107,8 @@ def calculate_seeburg_track(pre, post):
     if pre > 10:
         letter_index += 1
     number = pre % 10
+    if number == 0:
+       number = 10
     if (letter_index < 20):
        return (SELECTION_LETTERS[letter_index], number)
     else:
@@ -201,7 +208,7 @@ def main(argv=None):
                 logger.debug("running calculate_track(%d, %d)" % (pre, post))
                 (letter, number) = calculate_track(pre, post)
                 handle_key_combo(options.host, options.url, options.wallbox_number, letter, number)
-		time.sleep(3)
+		time.sleep(4)
             
             # Reset counters
             if pre_gap_pulses or post_gap_pulses:
