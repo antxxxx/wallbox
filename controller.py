@@ -13,11 +13,11 @@ from threading import Lock
 # Which pin to watch
 PIN = 13
 # How much time a change must be since the last in order to count as a change
-IGNORE_CHANGE_BELOW = 0.001
+IGNORE_CHANGE_BELOW = 0.02
 # What is the minimum time since the last pulse for a pulse to count as "after the gap"
-MIN_GAP_LEN = 0.25
+MIN_GAP_LEN = 0.2
 # What is the mimimum time since the last pulse for a pulse to count as a new train
-MIN_TRAIN_BOUNDARY = 0.1
+MIN_TRAIN_BOUNDARY = 0.3
 # How often to update the last change value to stop diff overflowing
 OVERFLOW_PROTECTION_INTERVAL = 60
 # Letters available for selection on the wallbox
@@ -56,6 +56,7 @@ def handle_gpio_interrupt(channel):
                 # should switch to post gap? it's gap > gap len but less than train boundary. Only when we're doing numbers, though.
                 if pre_gap and diff > MIN_GAP_LEN and diff < MIN_TRAIN_BOUNDARY:
                     pre_gap = False
+		    logger.debug(diff)
 
                 if pre_gap:
                     pre_gap_pulses += 1
@@ -101,8 +102,10 @@ def calculate_seeburg_track(pre, post):
     if pre > 10:
         letter_index += 1
     number = pre % 10
-    
-    return (SELECTION_LETTERS[letter_index], number)
+    if (letter_index < 20):
+       return (SELECTION_LETTERS[letter_index], number)
+    else:
+       return ('Z', 0)
 
 def calculate_amirowe_track(pre, post):
     """calculates a track selection for an AMi/Rowe Wallbox
@@ -198,6 +201,7 @@ def main(argv=None):
                 logger.debug("running calculate_track(%d, %d)" % (pre, post))
                 (letter, number) = calculate_track(pre, post)
                 handle_key_combo(options.host, options.url, options.wallbox_number, letter, number)
+		time.sleep(3)
             
             # Reset counters
             if pre_gap_pulses or post_gap_pulses:
