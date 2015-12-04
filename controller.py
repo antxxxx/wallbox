@@ -13,11 +13,11 @@ from threading import Lock
 # Which pin to watch
 PIN = 13
 # How much time a change must be since the last in order to count as a change
-IGNORE_CHANGE_BELOW = 0.01
+IGNORE_CHANGE_BELOW = 0.001
 # What is the minimum time since the last pulse for a pulse to count as "after the gap"
 MIN_GAP_LEN = 0.25
 # What is the mimimum time since the last pulse for a pulse to count as a new train
-MIN_TRAIN_BOUNDARY = 0.4
+MIN_TRAIN_BOUNDARY = 0.1
 # How often to update the last change value to stop diff overflowing
 OVERFLOW_PROTECTION_INTERVAL = 60
 # Letters available for selection on the wallbox
